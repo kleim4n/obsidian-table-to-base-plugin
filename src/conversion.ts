@@ -1,10 +1,11 @@
-import { App, TFile, TFolder } from 'obsidian';
+import { App, TFile, TFolder, FileManager } from 'obsidian';
 
 const NOTES_FOLDER = 'base_notes';
 
 export async function convertTableToBase(
 	app: App,
 	table: MarkdownTable,
+	fileManager: FileManager,
 	sourceBasename: string,
 ): Promise<string> {
 	const headers = table.headers.map((header) => header.trim());
@@ -100,7 +101,7 @@ export async function convertTableToBase(
 		const cleanupErrors: unknown[] = [];
 		for (const file of createdFiles.reverse()) {
 			try {
-				await app.vault.delete(file);
+				await fileManager.trashFile(file);
 			} catch (cleanupError) {
 				cleanupErrors.push(cleanupError);
 			}
@@ -109,7 +110,7 @@ export async function convertTableToBase(
 			const folder = app.vault.getAbstractFileByPath(NOTES_FOLDER);
 			if (folder instanceof TFolder && folder.children.length === 0) {
 				try {
-					await app.vault.delete(folder);
+					await fileManager.trashFile(folder);
 				} catch (cleanupError) {
 					cleanupErrors.push(cleanupError);
 				}
@@ -180,10 +181,10 @@ function createBaseContent(headers: string[], noteNames: string[]): string {
 	];
 	const noteFilters = noteNames.length
 		? noteNames.map((name) => {
-				const path = `${NOTES_FOLDER}/${name}.md`;
-				const expression = `file.path == ${JSON.stringify(path)}`;
-				return `        - ${JSON.stringify(expression)}`;
-			})
+			const path = `${NOTES_FOLDER}/${name}.md`;
+			const expression = `file.path == ${JSON.stringify(path)}`;
+			return `        - ${JSON.stringify(expression)}`;
+		})
 		: [`        - ${JSON.stringify('file.path == ""')}`];
 	return [
 		'filters:',
