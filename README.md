@@ -1,92 +1,73 @@
-# Obsidian Sample Plugin
+# Markdown Table to Obsidian Bases
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+Plugin para Obsidian que transforma uma tabela Markdown em notas individuais
+e em uma visualização do tipo Base.
 
-This project uses TypeScript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in TypeScript Definition format, which contains TSDoc comments describing what it does.
+## Como converter uma tabela
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
+No editor, clique com o botão direito em uma célula da tabela e selecione
+**Converter em Base+Notas**. A tabela precisa ter as colunas `file_name` e
+`file_content`:
 
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open modal (simple)" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and outputs a Notice on click.
-- Registers a global interval which logs 'setInterval' to the console.
+| file_name | file_content | status |
+| --- | --- | --- |
+| Primeira nota | Conteúdo da nota | Rascunho |
 
-## First time developing plugins?
+- `file_name` define o nome de cada arquivo Markdown.
+- `file_content` define o corpo da nota.
+- Todas as outras colunas viram propriedades do frontmatter.
+- Nomes de arquivo repetidos recebem sufixos numéricos, como `_2`.
+- As notas são criadas na pasta `base_notes/` na raiz do vault.
+- O arquivo `.base` é criado na raiz do vault, com o nome da nota atual
+  seguido de `_base`.
+- A Base filtra as notas criadas para aquela tabela.
+- A tabela original é substituída por um embed da Base.
 
-Quick starting guide for new plugin devs:
+O plugin não sobrescreve notas existentes: se um nome já estiver em uso,
+escolhe o próximo sufixo disponível. Se o arquivo `.base` de destino já
+existir, a conversão para e informa o conflito. Os nomes são sanitizados para
+remover caracteres inválidos em nomes de arquivos.
 
-- Check if [someone already developed a plugin for what you want](https://obsidian.md/plugins)! There might be an existing plugin similar enough that you can partner up with.
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `src/main.ts` to `main.js`.
-- Make changes to `src/main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
+## Instalação manual
 
-## Releasing new releases
+1. Execute `npm ci` na pasta do repositório.
+2. Execute `npm run build`.
+3. Copie `main.js` e `manifest.json` para:
+   `<Vault>/.obsidian/plugins/md-table-2-obsidian-base-plugin/`.
+4. No Obsidian, recarregue os plugins ou reinicie o aplicativo.
+5. Ative o plugin em **Configurações → Plugins da comunidade**.
 
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments. Note: The manifest.json file must be in two places, first the root path of your repository and also in the release.
-- Publish the release.
+Não é necessário copiar `README.md`, `node_modules` ou `styles.css`.
 
-> You can simplify the version bump process by running `npm version patch`, `npm version minor` or `npm version major` after updating `minAppVersion` manually in `manifest.json`.
-> The command will bump version in `manifest.json` and `package.json`, and add the entry for the new version to `versions.json`
+## Desenvolvimento
 
-## Adding your plugin to the community plugin list
+Requisitos: Node.js 18 ou superior e npm.
 
-- Check the [plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines).
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
-
-## How to use
-
-- Clone this repo.
-- Make sure your NodeJS is at least v18 (`node --version`).
-- `npm i` to install dependencies.
-- `npm run dev` to start compilation in watch mode.
-
-## Manually installing the plugin
-
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
-
-## Improve code quality with eslint
-
-- [ESLint](https://eslint.org/) is a tool that analyzes your code to quickly find problems. You can run ESLint against your plugin to find common bugs and ways to improve your code.
-- This project already has eslint preconfigured, you can invoke a check by running`npm run lint`
-- Together with a custom eslint [plugin](https://github.com/obsidianmd/eslint-plugin) for Obsidan specific code guidelines.
-- A GitHub action is preconfigured to automatically lint every commit on all branches.
-
-## Funding URL
-
-You can include funding URLs where people who use your plugin can financially support it.
-
-The simple way is to set the `fundingUrl` field to your link in your `manifest.json` file:
-
-```json
-{
-	"fundingUrl": "https://buymeacoffee.com"
-}
+```bash
+npm ci
+npm run dev
 ```
 
-If you have multiple URLs, you can also do:
+`npm run dev` recompila o plugin quando os arquivos de origem mudam. Para
+validar antes de enviar alterações:
 
-```json
-{
-	"fundingUrl": {
-		"Buy Me a Coffee": "https://buymeacoffee.com",
-		"GitHub Sponsor": "https://github.com/sponsors",
-		"Patreon": "https://www.patreon.com/"
-	}
-}
+```bash
+npm run build
+npm run lint
 ```
 
-## API Documentation
+O código-fonte fica em `src/`. O build gera `main.js` na raiz, mas esse arquivo
+é artefato gerado e não deve ser versionado; anexe-o a uma release junto com
+`manifest.json`.
 
-See https://docs.obsidian.md
+## Publicação de uma versão
+
+1. Atualize a versão SemVer em `manifest.json`.
+2. Adicione ou atualize a correspondência da versão para `minAppVersion` em
+   `versions.json`.
+3. Rode `npm run build` e `npm run lint`.
+4. Crie uma tag Git igual à versão, sem prefixo `v`.
+5. Na release do GitHub, anexe `main.js` e `manifest.json`.
+
+Consulte as [diretrizes de plugins do Obsidian](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines)
+antes de publicar.

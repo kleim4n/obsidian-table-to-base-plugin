@@ -1,114 +1,150 @@
-import {
-	Editor,
-	MarkdownView,
-	MarkdownFileInfo,
-	Modal,
-	Notice,
-	Plugin,
-} from 'obsidian';
-import {
-	DEFAULT_SETTINGS,
-	MyPluginSettings,
-	SampleSettingTab,
-} from './settings';
+import { Notice, Plugin } from 'obsidian';
+import { convertTableToBase } from './conversion';
 
-// Remember to rename these classes and interfaces!
-
-export default class MyPlugin extends Plugin {
-	settings!: MyPluginSettings;
-
+export default class MarkdownTableToBasePlugin extends Plugin {
 	async onload() {
-		await this.loadSettings();
-
-		// This creates an icon in the left ribbon.
-		this.addRibbonIcon('dice', 'Sample', (_evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
-		});
-
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status bar text');
-
-		// This adds a simple command that can be triggered anywhere
-		this.addCommand({
-			id: 'open-modal-simple',
-			name: 'Open modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			},
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'replace-selected',
-			name: 'Replace selected content',
-			editorCallback: (
-				editor: Editor,
-				_ctx: MarkdownView | MarkdownFileInfo,
-			) => {
-				editor.replaceSelection('Sample editor command');
-			},
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-modal-complex',
-			name: 'Open modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView =
-					this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
+		this.registerEvent(
+			this.app.workspace.on('editor-menu', (menu, editor, info) => {
+				const table = findTableAtLine(
+					editor.getValue().split('\n'),
+					editor.getCursor().line,
+				);
+				if (!table) {
+					return;
 				}
-				return false;
-			},
-		});
 
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
+				menu.addItem((item) =>
+					item
+						.setTitle('Converter em Base+Notas')
+						.setIcon('database')
+						.onClick(async () => {
+							const file = info.file;
+							if (!file) {
+								new Notice('Não foi possível identificar a nota atual.');
+								return;
+							}
 
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(activeDocument, 'click', (_evt: MouseEvent) => {
-			new Notice('Click');
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(
-			window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000),
+							try {
+								const embed = await convertTableToBase(
+									this.app,
+									table,
+									file.basename,
+								);
+								editor.replaceRange(
+									embed,
+									{ line: table.startLine, ch: 0 },
+									{
+										line: table.endLine,
+										ch: editor.getLine(table.endLine).length,
+									},
+								);
+								new Notice('Tabela convertida em Base+Notas.');
+							} catch (error) {
+								const message =
+									error instanceof Error
+										? error.message
+										: String(error);
+								new Notice(`Falha ao converter a tabela: ${message}`);
+							}
+						}),
+				);
+			}),
 		);
-	}
-
-	onunload() {}
-
-	async loadSettings() {
-		this.settings = Object.assign(
-			{},
-			DEFAULT_SETTINGS,
-			(await this.loadData()) as Partial<MyPluginSettings>,
-		);
-	}
-
-	async saveSettings() {
-		await this.saveData(this.settings);
 	}
 }
 
-class SampleModal extends Modal {
-	onOpen() {
-		const { contentEl } = this;
-		contentEl.setText('Woah!');
+function findTableAtLine(lines: string[], line: number): MarkdownTable | null {
+	for (let headerLine = 0; headerLine < lines.length - 1; headerLine++) {
+		const headerText = lines[headerLine];
+		const delimiterText = lines[headerLine + 1];
+		if (headerText === undefined || delimiterText === undefined) {
+			continue;
+		}
+		const headers = splitTableRow(headerText);
+		const delimiters = splitTableRow(delimiterText);
+		if (
+			!headers ||
+			!delimiters ||
+			headers.length !== delimiters.length ||
+			!delimiters.every((cell) => /^:?-{3,}:?$/.test(cell.trim()))
+		) {
+			continue;
+		}
+
+		let endLine = headerLine + 1;
+		while (endLine + 1 < lines.length) {
+			const nextLine = lines[endLine + 1];
+			if (nextLine === undefined || !splitTableRow(nextLine)) {
+				break;
+			}
+			endLine++;
+		}
+		if (line < headerLine || line > endLine) {
+			continue;
+		}
+
+		const rows: string[][] = [];
+		for (let rowLine = headerLine + 2; rowLine <= endLine; rowLine++) {
+			const rowText = lines[rowLine];
+			const row = rowText === undefined ? null : splitTableRow(rowText);
+			if (!row) {
+				return null;
+			}
+			rows.push(row);
+		}
+
+		return { startLine: headerLine, endLine, headers, rows };
+	}
+	return null;
+}
+
+function splitTableRow(line: string): string[] | null {
+	const trimmed = line.trim();
+	if (!trimmed.includes('|')) {
+		return null;
 	}
 
-	onClose() {
-		const { contentEl } = this;
-		contentEl.empty();
+	const cells: string[] = [];
+	const delimiters: number[] = [];
+	let cellStart = 0;
+	for (let index = 0; index < trimmed.length; index++) {
+		if (trimmed.charAt(index) !== '|') {
+			continue;
+		}
+
+		let backslashes = 0;
+		for (
+			let previous = index - 1;
+			previous >= 0 && trimmed.charAt(previous) === '\\';
+			previous--
+		) {
+			backslashes++;
+		}
+		if (backslashes % 2 === 1) {
+			continue;
+		}
+
+		delimiters.push(index);
+		cells.push(trimmed.slice(cellStart, index).trim());
+		cellStart = index + 1;
 	}
+	cells.push(trimmed.slice(cellStart).trim());
+
+	if (delimiters.length > 0 && delimiters[0] === 0) {
+		cells.shift();
+	}
+	if (
+		delimiters.length > 0 &&
+		delimiters[delimiters.length - 1] === trimmed.length - 1
+	) {
+		cells.pop();
+	}
+	return cells.map((cell) => cell.replace(/\\\|/g, '|'));
+}
+
+interface MarkdownTable {
+	startLine: number;
+	endLine: number;
+	headers: string[];
+	rows: string[][];
 }
