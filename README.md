@@ -1,4 +1,4 @@
-# Obsidian Table to Base
+# Table to Base
 
 Transforme uma tabela Markdown em notas organizadas e acompanhe tudo em uma
 Base do Obsidian. Em vez de criar cada nota à mão, você planeja os itens numa
@@ -95,8 +95,8 @@ será reutilizado.
 1. Execute `npm ci` na pasta do projeto.
 2. Execute `npm run build`.
 3. Copie `main.js` e `manifest.json` para:
-   `<Vault>/.obsidian/plugins/obsidian-table-to-base-plugin/`.
-4. No Obsidian, recarregue os plugins e ative **Obsidian Table to Base** em
+   `<Vault>/.obsidian/plugins/table-to-base/`.
+4. No Obsidian, recarregue os plugins e ative **Table to Base** em
    **Configurações → Plugins da comunidade**.
 
 As traduções são incluídas em `main.js` durante o build; não é preciso copiar
