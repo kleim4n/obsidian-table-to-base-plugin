@@ -85,6 +85,7 @@ export default class MarkdownTableToBasePlugin extends Plugin {
 				table,
 				this.app.fileManager,
 				file.basename,
+				file.parent?.path ?? '',
 				this.settings,
 				this.settings.language,
 			);

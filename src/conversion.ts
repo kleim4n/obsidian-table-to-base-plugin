@@ -7,6 +7,7 @@ export async function convertTableToBase(
 	table: MarkdownTable,
 	fileManager: FileManager,
 	sourceBasename: string,
+	sourceFolderPath: string,
 	settings: PluginSettings,
 	language: string,
 ): Promise<string> {
@@ -36,7 +37,11 @@ export async function convertTableToBase(
 		throw new Error(translate(language, 'error.rowLength'));
 	}
 
-	const folderPath = normalizeFolderPath(settings.outputFolder, language);
+	const folderPath = normalizeFolderPath(
+		settings.outputFolder,
+		sourceFolderPath,
+		language,
+	);
 	const basePath = `${sourceBasename}_base.base`;
 	const loadedFiles = app.vault.getAllLoadedFiles();
 	const existingPaths = new Set(loadedFiles.map((file) => file.path.toLowerCase()));
@@ -139,7 +144,13 @@ export async function convertTableToBase(
 		for (const note of generatedNotes) {
 			createdFiles.push(await app.vault.create(note.path, note.content));
 		}
-		if (!baseEntry) {
+		if (baseEntry instanceof TFile) {
+			const existingBaseContent = await app.vault.read(baseEntry);
+			await app.vault.modify(
+				baseEntry,
+				updateBaseFilters(existingBaseContent, baseContent, language),
+			);
+		} else {
 			createdFiles.push(await app.vault.create(basePath, baseContent));
 		}
 	} catch (error) {
@@ -172,6 +183,22 @@ export async function convertTableToBase(
 	}
 
 	return `![[${basePath}]]`;
+}
+
+function updateBaseFilters(
+	existingContent: string,
+	generatedContent: string,
+	language: string,
+): string {
+	const existingViewsStart = existingContent.indexOf('\nviews:');
+	const generatedViewsStart = generatedContent.indexOf('\nviews:');
+	if (existingViewsStart === -1 || generatedViewsStart === -1) {
+		throw new Error(translate(language, 'error.baseUpdateUnsupported'));
+	}
+
+	const generatedFilters = generatedContent.slice(0, generatedViewsStart);
+	const existingViews = existingContent.slice(existingViewsStart + 1);
+	return `${generatedFilters}\n${existingViews}`;
 }
 
 function getCell(
@@ -221,8 +248,16 @@ function sanitizeFileName(name: string): string {
 		: sanitized;
 }
 
-function normalizeFolderPath(path: string, language: string): string {
-	const normalized = path.trim().replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+function normalizeFolderPath(
+	path: string,
+	sourceFolderPath: string,
+	language: string,
+): string {
+	const normalized = path
+		.trim()
+		.replace(/\\/g, '/')
+		.replaceAll('{{currentFolder}}', sourceFolderPath)
+		.replace(/^\/+|\/+$/g, '');
 	if (
 		normalized.split('/').some((segment) =>
 			segment === '' || segment === '.' || segment === '..',

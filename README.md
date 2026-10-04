@@ -1,54 +1,91 @@
 # Obsidian Table to Base
 
-Plugin para Obsidian que transforma uma tabela Markdown em notas individuais
-e em uma visualização do tipo Base.
+Transforme uma tabela Markdown em notas organizadas e acompanhe tudo em uma
+Base do Obsidian. Em vez de criar cada nota à mão, você planeja os itens numa
+tabela e deixa o plugin preparar os arquivos para você.
 
-## Como converter uma tabela
+## Um exemplo: organizar o semestre de uma disciplina
 
-No editor, clique com o botão direito em uma célula da tabela e selecione
-**Converter em base+notas**, ou execute **Converter tabela do arquivo atual em
-base** pela paleta de comandos. A ação da paleta funciona apenas quando o
-arquivo contém exatamente uma tabela Markdown; se encontrar mais de uma,
-informa que esse modo processa uma tabela por vez. A tabela precisa ter a coluna de nome do arquivo
-(`file_name` por padrão) e a coluna `file_content`:
+Imagine que você está preparando o semestre de uma disciplina. Pode listar
+leituras, trabalhos, provas e outras atividades numa tabela dentro da nota da
+disciplina:
 
-| file_name | file_content | status |
-| --- | --- | --- |
-| Primeira nota | Conteúdo da nota | Rascunho |
+| file_name | file_content | tipo | data | status | tags |
+| --- | --- | --- | --- | --- | --- |
+| Leitura - semana 1 | Ler o capítulo introdutório e anotar dúvidas. | Leitura | 2026-03-09 | Pendente | estudo |
+| Trabalho - resenha | Preparar uma resenha do texto escolhido. | Trabalho | 2026-04-02 | Pendente | estudo, escrita |
+| Prova parcial | Rever as anotações das primeiras semanas. | Prova | 2026-05-12 | Pendente | estudo |
 
-- `file_name` define o nome de cada arquivo Markdown por padrão. A coluna pode
-  ser alterada nas configurações do plugin.
-- `file_content` define o corpo da nota.
-- Todas as outras colunas viram propriedades do frontmatter.
-- Uma coluna `tags` aceita tags separadas por vírgulas; a tag usada pela Base é
-  acrescentada automaticamente.
-- Nomes de arquivo repetidos recebem sufixos numéricos, como `_2`.
-- Por padrão, as notas são criadas na pasta `base_notes/` na raiz do vault.
-- A pasta de destino, a coluna do nome do arquivo, a tag da Base e a permissão
-  para valores vazios podem ser configuradas nas opções do plugin. O idioma
-  também pode ser escolhido; sem uma seleção, o idioma do Obsidian é usado.
-  A tag fica vazia por padrão e usa o nome da nota atual.
-- O arquivo `.base` é criado na raiz do vault, com o nome da nota atual
-  seguido de `_base`.
-- A Base encontra as notas pela tag e pasta. Converter outra tabela da mesma
-  nota reutiliza o arquivo `.base` e aplica a mesma tag às novas notas.
-- A tabela original é substituída por um embed da Base.
+Ao converter a tabela, cada linha vira uma nota. As colunas `tipo`, `data`,
+`status` e `tags` são salvas como propriedades, e `file_content` vira o corpo
+da nota. Assim, você pode abrir uma atividade para acrescentar anotações sem
+perder a visão geral do semestre.
 
-O plugin não sobrescreve notas existentes: se um nome já estiver em uso,
-escolhe o próximo sufixo disponível. Se o arquivo `.base` de destino já
-existir, ele é reutilizado. Os nomes são sanitizados para remover caracteres
-inválidos em nomes de arquivos.
+### O que será criado
+
+Por padrão, os arquivos ficam organizados assim:
+
+```text
+Meu semestre.md                 ← a tabela é substituída pelo embed da Base
+Meu semestre_base.base           ← define a tabela e filtra as notas pela tag
+base_notes/
+├── Leitura - semana 1.md
+├── Trabalho - resenha.md
+└── Prova parcial.md
+```
+
+O arquivo `.base` fica na raiz do vault; as notas são salvas em `base_notes/`
+por padrão. A Base mostra as notas geradas para aquela organização. Se você
+converter outra tabela na mesma nota, o plugin reutiliza a Base e marca as
+novas notas com a mesma tag.
+
+## Como converter
+
+No editor, clique com o botão direito em uma célula da tabela e escolha
+**Converter em base+notas**. Ou abra a paleta de comandos e execute
+**Converter tabela do arquivo atual em base**. A paleta só converte quando
+encontra exatamente uma tabela Markdown no arquivo; se encontrar mais de uma,
+avisa que esse modo processa uma tabela por vez.
+
+A tabela precisa ter uma coluna para o nome do arquivo e outra chamada
+`file_content`. Por padrão, a coluna de nome é `file_name`.
+
+| Coluna | Para que serve |
+| --- | --- |
+| `file_name` | Nome da nota gerada. O nome da coluna pode ser alterado nas configurações. |
+| `file_content` | Texto que forma o corpo da nota. |
+| Outras colunas | Propriedades no frontmatter da nota. |
+| `tags` | Tags separadas por vírgulas; a tag da Base é acrescentada automaticamente. |
+
+## Configurações
+
+Nas configurações do plugin, você pode escolher:
+
+- **Pasta de destino** das notas. O padrão é `base_notes`; deixe vazia para
+  salvar na raiz do vault. Para criar a pasta em relação à pasta da nota atual,
+  use `{{currentFolder}}`, por exemplo `{{currentFolder}}/base_notes`.
+- **Coluna do nome do arquivo**. O padrão é `file_name`.
+- **Tag da Base**. Se ficar vazia, será usado o nome da nota onde está a
+  tabela.
+- Se as propriedades podem ter **valores vazios**.
+- **Idioma** da interface. Você pode escolher português ou inglês; no modo
+  automático, o plugin acompanha o idioma do Obsidian.
+
+O plugin não substitui notas existentes. Se um nome já estiver em uso, ele
+acrescenta um sufixo, como `_2`. Se o arquivo `.base` da nota já existir, ele
+será reutilizado.
 
 ## Instalação manual
 
-1. Execute `npm ci` na pasta do repositório.
+1. Execute `npm ci` na pasta do projeto.
 2. Execute `npm run build`.
 3. Copie `main.js` e `manifest.json` para:
    `<Vault>/.obsidian/plugins/obsidian-table-to-base-plugin/`.
-4. No Obsidian, recarregue os plugins ou reinicie o aplicativo.
-5. Ative o plugin em **Configurações → Plugins da comunidade**.
+4. No Obsidian, recarregue os plugins e ative **Obsidian Table to Base** em
+   **Configurações → Plugins da comunidade**.
 
-Não é necessário copiar `README.md`, `node_modules` ou `styles.css`.
+As traduções são incluídas em `main.js` durante o build; não é preciso copiar
+os arquivos da pasta `src/`.
 
 ## Desenvolvimento
 
@@ -59,26 +96,25 @@ npm ci
 npm run dev
 ```
 
-`npm run dev` recompila o plugin quando os arquivos de origem mudam. Para
-validar antes de enviar alterações:
+`npm run dev` recompila o plugin enquanto você edita os arquivos. Para
+validar as alterações:
 
 ```bash
 npm run build
 npm run lint
 ```
 
-O código-fonte fica em `src/`. O build gera `main.js` na raiz, mas esse arquivo
-é artefato gerado e não deve ser versionado; anexe-o a uma release junto com
-`manifest.json`.
+O código-fonte fica em `src/`. O build gera `main.js` na raiz; esse arquivo é
+artefato gerado e não deve ser versionado.
 
-## Publicação de uma versão
+## Publicação
 
 1. Atualize a versão SemVer em `manifest.json`.
-2. Adicione ou atualize a correspondência da versão para `minAppVersion` em
-   `versions.json`.
+2. Atualize em `versions.json` a versão e o `minAppVersion` correspondente.
 3. Rode `npm run build` e `npm run lint`.
-4. Crie uma tag Git igual à versão, sem prefixo `v`.
-5. Na release do GitHub, anexe `main.js` e `manifest.json`.
+4. Crie uma tag Git igual à versão, sem o prefixo `v`.
+5. Anexe `main.js` e `manifest.json` à release.
 
-Consulte as [diretrizes de plugins do Obsidian](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines)
+Consulte as
+[diretrizes de plugins do Obsidian](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines)
 antes de publicar.
