@@ -1,7 +1,7 @@
 {
 	"id": "table-to-base",
 	"name": "Table to Base",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"minAppVersion": "1.9.0",
 	"description": "Converts Markdown tables into notes and Bases.",
 	"author": "Gabriel Moraes Kleiman",
