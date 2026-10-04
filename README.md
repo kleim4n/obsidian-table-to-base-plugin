@@ -1,118 +1,117 @@
 # Table to Base
 
-Transforme uma tabela Markdown em notas organizadas e acompanhe tudo em uma
-Base do Obsidian. Em vez de criar cada nota à mão, você planeja os itens numa
-tabela e deixa o plugin preparar os arquivos para você.
+Turn a Markdown table into organized notes and track them in a Base. Instead
+of creating each note by hand, plan your items in a table and let the plugin
+prepare the files for you.
 
-## Um exemplo: organizar o semestre de uma disciplina
+## Example: organize a course semester
 
-Imagine que você está preparando o semestre de uma disciplina. Pode listar
-leituras, trabalhos, provas e outras atividades numa tabela dentro da nota da
-disciplina:
+Suppose you are preparing a course semester. List readings, assignments,
+exams, and other activities in a table inside the course note:
 
-| name | content | tipo | data | data_type | feito | feito_type | tags |
+| name | content | type | date | date_type | done | done_type | tags |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Leitura - semana 1 | Ler o capítulo introdutório e anotar dúvidas. | Leitura | 2026-03-09 | date | false | checkbox | estudo |
-| Trabalho - resenha | Preparar uma resenha do texto escolhido. | Trabalho | 2026-04-02 | date | null | bool | estudo, escrita |
-| Prova parcial | Rever as anotações das primeiras semanas. | Prova | 2026-05-12 | date | false | check box | estudo |
+| Reading - week 1 | Read the introductory chapter and note questions. | Reading | 2026-03-09 | date | false | checkbox | study |
+| Essay | Prepare an essay on the selected text. | Assignment | 2026-04-02 | date | null | bool | study, writing |
+| Midterm | Review notes from the first few weeks. | Exam | 2026-05-12 | date | false | check box | study |
 
-Ao converter a tabela, cada linha vira uma nota. As colunas `tipo`, `data`,
-`feito` e `tags` são salvas como propriedades, e `content` vira o corpo
-da nota. A coluna `feito_type` define o tipo da propriedade `feito` para a
-linha; `checkbox`, `bool` e `check box` são aceitos para caixas de seleção.
-Assim, você pode abrir uma atividade para acrescentar anotações sem
-perder a visão geral do semestre.
+When you convert the table, each row becomes a note. The `type`, `date`,
+`done`, and `tags` columns are saved as properties, while `content` becomes
+the note body. The `done_type` column declares the type of the `done`
+property; `checkbox`, `bool`, and `check box` are accepted for checkboxes.
+You can open an activity to add notes without losing the overview of the
+semester.
 
-### O que será criado
+### What gets created
 
-Por padrão, os arquivos ficam organizados assim:
+By default, the files are organized like this:
 
 ```text
-Meu semestre.md                 ← a tabela é substituída pelo embed da Base
-Meu semestre_base.base           ← define a tabela e filtra as notas pela tag
+My semester.md                  <- the table is replaced by a Base embed
+My semester_base.base           <- defines the table and filters notes by tag
 base_notes/
-├── Leitura - semana 1.md
-├── Trabalho - resenha.md
-└── Prova parcial.md
+|-- Reading - week 1.md
+|-- Essay.md
+`-- Midterm.md
 ```
 
-O arquivo `.base` fica na raiz do vault; as notas são salvas em `base_notes/`
-por padrão. A Base mostra as notas geradas para aquela organização. Se você
-converter outra tabela na mesma nota, o plugin reutiliza a Base e marca as
-novas notas com a mesma tag.
+The `.base` file is created at the vault root; notes are saved in `base_notes/`
+by default. The Base shows the notes generated for that plan. If you convert
+another table in the same note, the plugin reuses the Base and applies the
+same tag to the new notes.
 
-## Como converter
+## Convert a table
 
-No editor, clique com o botão direito em uma célula da tabela e escolha
-**Converter em base+notas**. Ou abra a paleta de comandos e execute
-**Converter tabela do arquivo atual em base**. A paleta só converte quando
-encontra exatamente uma tabela Markdown no arquivo; se encontrar mais de uma,
-avisa que esse modo processa uma tabela por vez.
+In the editor, right-click a table cell and select **Convert to base+notes**.
+Or open the command palette and run
+**Convert the table in the current file to a base**.
+The command palette converts only when it finds exactly one Markdown table in
+the file. If there is more than one, it tells you that this mode supports one
+table at a time.
 
-A tabela precisa ter uma coluna para o nome do arquivo e outra chamada
-`content`. Por padrão, a coluna de nome é `name`.
+The table must have a column for the note name and another named `content`.
+The default name column is `name`.
 
-| Coluna | Para que serve |
+| Column | Purpose |
 | --- | --- |
-| `name` | Nome da nota gerada. O nome da coluna pode ser alterado nas configurações. |
-| `content` | Texto que forma o corpo da nota. |
-| Outras colunas | Propriedades no frontmatter da nota. |
-| `tags` | Tags separadas por vírgulas; a tag da Base é acrescentada automaticamente. |
-| `<propriedade>_type` | Declara o tipo da propriedade correspondente. A coluna auxiliar não vira propriedade. |
+| `name` | Name of the generated note. You can change the column name in settings. |
+| `content` | Text used as the note body. |
+| Other columns | Properties in the note's frontmatter. |
+| `tags` | Comma-separated tags; the Base tag is added automatically. |
+| `<property>_type` | Declares the type of the matching property. This helper column is not itself a property. |
 
-Tipos suportados: `text`, `list`, `number`, `bool`, `checkbox`, `date`,
-`date & time` (ou `datetime`) e `tags`. Para booleanos, use `true`, `false` ou
-`null`. A mesma propriedade precisa usar o mesmo tipo em todas as linhas.
-Listas podem ser separadas por vírgula ou escritas como JSON; datas devem estar
-no formato ISO, como `2026-03-09`.
+Supported types: `text`, `list`, `number`, `bool`, `checkbox`, `date`,
+`date & time` (or `datetime`), and `tags`. Use `true`, `false`, or `null` for
+boolean values. A property must use the same type in every row. Lists can be
+comma-separated or written as JSON; dates must use ISO format, such as
+`2026-03-09`.
 
-Use `{{date:FORMATO}}` em **Pasta de destino** e na coluna `name` para inserir
-a data/hora atual. Por exemplo, `{{date:YYYY}}/{{date:MM}}` cria pastas por
-ano e mês; `Atividade {{date:YYYY-MM-DD}}` inclui a data no nome da nota.
-Os formatos seguem a sintaxe do Moment.js.
+Use `{{date:FORMAT}}` in **Output folder** and in the `name` column to insert
+the current date and time. For example, `{{date:YYYY}}/{{date:MM}}` creates
+year/month folders, while `Activity {{date:YYYY-MM-DD}}` adds the date to the
+note name. Formats follow Moment.js syntax.
 
-## Configurações
+## Settings
 
-Nas configurações do plugin, você pode escolher:
+In the plugin settings, you can choose:
 
-- **Pasta de destino** das notas. O padrão é `base_notes`; deixe vazia para
-  salvar na raiz do vault. Para criar a pasta em relação à pasta da nota atual,
-  use `{{currentFolder}}`, por exemplo `{{currentFolder}}/base_notes`.
-- **Coluna do nome do arquivo**. O padrão é `name`.
-- A coluna `content` fornece o corpo da nota.
-- **Tag da Base**. Se ficar vazia, será usado o nome da nota onde está a
-  tabela.
-- Se as propriedades podem ter **valores vazios**.
-- **Idioma** da interface. Você pode escolher português ou inglês; no modo
-  automático, o plugin acompanha o idioma do Obsidian.
+- **Output folder** for notes. The default is `base_notes`; leave it empty to
+  save notes at the vault root. To create the folder relative to the current
+  note, use `{{currentFolder}}`, for example `{{currentFolder}}/base_notes`.
+- **File name column**. The default is `name`.
+- The `content` column provides the note body.
+- **Base tag**. If left empty, the name of the note containing the table is
+  used.
+- Whether properties can have **empty values**.
+- The interface **Language**. Choose English or Portuguese, or use automatic
+  mode to follow Obsidian's language.
 
-O plugin não substitui notas existentes. Se um nome já estiver em uso, ele
-acrescenta um sufixo, como `_2`. Se o arquivo `.base` da nota já existir, ele
-será reutilizado.
+The plugin does not overwrite existing notes. If a name is already in use, it
+adds a suffix such as `_2`. If the note's `.base` file already exists, it is
+reused.
 
-## Instalação manual
+## Manual installation
 
-1. Execute `npm ci` na pasta do projeto.
-2. Execute `npm run build`.
-3. Copie `main.js` e `manifest.json` para:
+1. Run `npm ci` in the project folder.
+2. Run `npm run build`.
+3. Copy `main.js` and `manifest.json` to:
    `<Vault>/.obsidian/plugins/table-to-base/`.
-4. No Obsidian, recarregue os plugins e ative **Table to Base** em
-   **Configurações → Plugins da comunidade**.
+4. In Obsidian, reload plugins and enable **Table to Base** under
+   **Settings → Community plugins**.
 
-As traduções são incluídas em `main.js` durante o build; não é preciso copiar
-os arquivos da pasta `src/`.
+Translations are bundled into `main.js` during the build; you do not need to
+copy files from `src/`.
 
-## Desenvolvimento
+## Development
 
-Requisitos: Node.js 18 ou superior e npm.
+Requirements: Node.js 18 or later and npm.
 
 ```bash
 npm ci
 npm run dev
 ```
 
-`npm run dev` recompila o plugin enquanto você edita os arquivos. Para
-validar as alterações:
+`npm run dev` rebuilds the plugin as you edit files. To validate changes:
 
 ```bash
 npm test
@@ -120,5 +119,5 @@ npm run build
 npm run lint
 ```
 
-O código-fonte fica em `src/`. O build gera `main.js` na raiz; esse arquivo é
-artefato gerado e não deve ser versionado.
+Source code is in `src/`. The build generates `main.js` in the project root;
+this generated file should not be committed.

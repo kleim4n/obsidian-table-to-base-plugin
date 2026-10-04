@@ -15,7 +15,7 @@ export default class MarkdownTableToBasePlugin extends Plugin {
 		);
 		this.addSettingTab(new PluginSettingTab(this.app, this));
 		this.addCommand({
-			id: 'convert-table-to-base',
+			id: 'convert-table',
 			name: translate(this.settings.language, 'command.paletteConvert'),
 			callback: async () => {
 				const activeEditor = this.app.workspace.activeEditor;

@@ -1,4 +1,5 @@
 import { App, FileManager, moment, TFile, TFolder } from 'obsidian';
+import type { Moment } from 'moment';
 import { PluginSettings } from './settings';
 import { translate } from './i18n';
 import {
@@ -42,7 +43,7 @@ export async function convertTableToBase(
 		throw new Error(translate(language, 'error.rowLength'));
 	}
 
-	const conversionTime = moment();
+	const conversionTime: Moment = moment();
 	const expandedFolder = formatDatePatterns(
 		settings.outputFolder
 			.trim()
@@ -58,11 +59,7 @@ export async function convertTableToBase(
 		throw new Error(translate(language, 'error.invalidFolder'));
 	}
 	const basePath = `${sourceBasename}_base.base`;
-	const loadedFiles = app.vault.getAllLoadedFiles();
-	const existingPaths = new Set(loadedFiles.map((file) => file.path.toLowerCase()));
-	const baseEntry = loadedFiles.find(
-		(file) => file.path.toLowerCase() === basePath.toLowerCase(),
-	);
+	const baseEntry = app.vault.getAbstractFileByPath(basePath);
 	if (baseEntry && !(baseEntry instanceof TFile)) {
 		throw new Error(
 			translate(language, 'error.baseFolderConflict', { path: basePath }),
@@ -73,9 +70,7 @@ export async function convertTableToBase(
 	let currentPath = '';
 	for (const segment of folderPath.split('/').filter(Boolean)) {
 		currentPath = currentPath ? `${currentPath}/${segment}` : segment;
-		const existing = loadedFiles.find(
-			(file) => file.path.toLowerCase() === currentPath.toLowerCase(),
-		);
+		const existing = app.vault.getAbstractFileByPath(currentPath);
 		if (existing && !(existing instanceof TFolder)) {
 			throw new Error(
 				translate(language, 'error.fileConflict', { path: currentPath }),
@@ -240,9 +235,9 @@ export async function convertTableToBase(
 		let suffix = 2;
 		while (
 			reservedNames.has(filename.toLowerCase()) ||
-			existingPaths.has(
-				`${folderPath ? `${folderPath}/` : ''}${filename}.md`.toLowerCase(),
-			)
+			app.vault.getAbstractFileByPath(
+				`${folderPath ? `${folderPath}/` : ''}${filename}.md`,
+			) !== null
 		) {
 			filename = `${sanitizedName}_${suffix}`;
 			suffix++;
