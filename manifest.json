@@ -3,6 +3,7 @@
 	"name": "Table to Base",
 	"version": "1.0.0",
 	"minAppVersion": "1.9.0",
-	"description": "Converts Markdown tables into notes and Obsidian Bases.",
+	"description": "Converts Markdown tables into notes and Bases.",
+	"author": "Gabriel Moraes Kleiman",
 	"isDesktopOnly": false
 }
