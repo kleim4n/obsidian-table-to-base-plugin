@@ -95,7 +95,7 @@ será reutilizado.
 1. Execute `npm ci` na pasta do projeto.
 2. Execute `npm run build`.
 3. Copie `main.js` e `manifest.json` para:
-   `<Vault>/.obsidian/plugins/obsidian-table-to-base-plugin/`.
+   `<Vault>/.obsidian/plugins/table-to-base/`.
 4. No Obsidian, recarregue os plugins e ative **Table to Base** em
    **Configurações → Plugins da comunidade**.
 
