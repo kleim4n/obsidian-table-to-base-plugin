@@ -122,15 +122,3 @@ npm run lint
 
 O código-fonte fica em `src/`. O build gera `main.js` na raiz; esse arquivo é
 artefato gerado e não deve ser versionado.
-
-## Publicação
-
-1. Atualize a versão SemVer em `manifest.json`.
-2. Atualize em `versions.json` a versão e o `minAppVersion` correspondente.
-3. Rode `npm run build` e `npm run lint`.
-4. Crie uma tag Git igual à versão, sem o prefixo `v`.
-5. Anexe `main.js` e `manifest.json` à release.
-
-Consulte as
-[diretrizes de plugins do Obsidian](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines)
-antes de publicar.
