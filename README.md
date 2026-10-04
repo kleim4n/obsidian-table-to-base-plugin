@@ -1,92 +1,124 @@
-# Obsidian Sample Plugin
+# Obsidian Table to Base
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+Transforme uma tabela Markdown em notas organizadas e acompanhe tudo em uma
+Base do Obsidian. Em vez de criar cada nota à mão, você planeja os itens numa
+tabela e deixa o plugin preparar os arquivos para você.
 
-This project uses TypeScript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in TypeScript Definition format, which contains TSDoc comments describing what it does.
+## Um exemplo: organizar o semestre de uma disciplina
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
+Imagine que você está preparando o semestre de uma disciplina. Pode listar
+leituras, trabalhos, provas e outras atividades numa tabela dentro da nota da
+disciplina:
 
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open modal (simple)" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and outputs a Notice on click.
-- Registers a global interval which logs 'setInterval' to the console.
+| name | content | tipo | data | data_type | feito | feito_type | tags |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Leitura - semana 1 | Ler o capítulo introdutório e anotar dúvidas. | Leitura | 2026-03-09 | date | false | checkbox | estudo |
+| Trabalho - resenha | Preparar uma resenha do texto escolhido. | Trabalho | 2026-04-02 | date | null | bool | estudo, escrita |
+| Prova parcial | Rever as anotações das primeiras semanas. | Prova | 2026-05-12 | date | false | check box | estudo |
 
-## First time developing plugins?
+Ao converter a tabela, cada linha vira uma nota. As colunas `tipo`, `data`,
+`feito` e `tags` são salvas como propriedades, e `content` vira o corpo
+da nota. A coluna `feito_type` define o tipo da propriedade `feito` para a
+linha; `checkbox`, `bool` e `check box` são aceitos para caixas de seleção.
+Assim, você pode abrir uma atividade para acrescentar anotações sem
+perder a visão geral do semestre.
 
-Quick starting guide for new plugin devs:
+### O que será criado
 
-- Check if [someone already developed a plugin for what you want](https://obsidian.md/plugins)! There might be an existing plugin similar enough that you can partner up with.
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `src/main.ts` to `main.js`.
-- Make changes to `src/main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
+Por padrão, os arquivos ficam organizados assim:
 
-## Releasing new releases
-
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments. Note: The manifest.json file must be in two places, first the root path of your repository and also in the release.
-- Publish the release.
-
-> You can simplify the version bump process by running `npm version patch`, `npm version minor` or `npm version major` after updating `minAppVersion` manually in `manifest.json`.
-> The command will bump version in `manifest.json` and `package.json`, and add the entry for the new version to `versions.json`
-
-## Adding your plugin to the community plugin list
-
-- Check the [plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines).
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
-
-## How to use
-
-- Clone this repo.
-- Make sure your NodeJS is at least v18 (`node --version`).
-- `npm i` to install dependencies.
-- `npm run dev` to start compilation in watch mode.
-
-## Manually installing the plugin
-
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
-
-## Improve code quality with eslint
-
-- [ESLint](https://eslint.org/) is a tool that analyzes your code to quickly find problems. You can run ESLint against your plugin to find common bugs and ways to improve your code.
-- This project already has eslint preconfigured, you can invoke a check by running`npm run lint`
-- Together with a custom eslint [plugin](https://github.com/obsidianmd/eslint-plugin) for Obsidan specific code guidelines.
-- A GitHub action is preconfigured to automatically lint every commit on all branches.
-
-## Funding URL
-
-You can include funding URLs where people who use your plugin can financially support it.
-
-The simple way is to set the `fundingUrl` field to your link in your `manifest.json` file:
-
-```json
-{
-	"fundingUrl": "https://buymeacoffee.com"
-}
+```text
+Meu semestre.md                 ← a tabela é substituída pelo embed da Base
+Meu semestre_base.base           ← define a tabela e filtra as notas pela tag
+base_notes/
+├── Leitura - semana 1.md
+├── Trabalho - resenha.md
+└── Prova parcial.md
 ```
 
-If you have multiple URLs, you can also do:
+O arquivo `.base` fica na raiz do vault; as notas são salvas em `base_notes/`
+por padrão. A Base mostra as notas geradas para aquela organização. Se você
+converter outra tabela na mesma nota, o plugin reutiliza a Base e marca as
+novas notas com a mesma tag.
 
-```json
-{
-	"fundingUrl": {
-		"Buy Me a Coffee": "https://buymeacoffee.com",
-		"GitHub Sponsor": "https://github.com/sponsors",
-		"Patreon": "https://www.patreon.com/"
-	}
-}
+## Como converter
+
+No editor, clique com o botão direito em uma célula da tabela e escolha
+**Converter em base+notas**. Ou abra a paleta de comandos e execute
+**Converter tabela do arquivo atual em base**. A paleta só converte quando
+encontra exatamente uma tabela Markdown no arquivo; se encontrar mais de uma,
+avisa que esse modo processa uma tabela por vez.
+
+A tabela precisa ter uma coluna para o nome do arquivo e outra chamada
+`content`. Por padrão, a coluna de nome é `name`.
+
+| Coluna | Para que serve |
+| --- | --- |
+| `name` | Nome da nota gerada. O nome da coluna pode ser alterado nas configurações. |
+| `content` | Texto que forma o corpo da nota. |
+| Outras colunas | Propriedades no frontmatter da nota. |
+| `tags` | Tags separadas por vírgulas; a tag da Base é acrescentada automaticamente. |
+| `<propriedade>_type` | Declara o tipo da propriedade correspondente. A coluna auxiliar não vira propriedade. |
+
+Tipos suportados: `text`, `list`, `number`, `bool`, `checkbox`, `date`,
+`date & time` (ou `datetime`) e `tags`. Para booleanos, use `true`, `false` ou
+`null`. A mesma propriedade precisa usar o mesmo tipo em todas as linhas.
+Listas podem ser separadas por vírgula ou escritas como JSON; datas devem estar
+no formato ISO, como `2026-03-09`.
+
+Use `{{date:FORMATO}}` em **Pasta de destino** e na coluna `name` para inserir
+a data/hora atual. Por exemplo, `{{date:YYYY}}/{{date:MM}}` cria pastas por
+ano e mês; `Atividade {{date:YYYY-MM-DD}}` inclui a data no nome da nota.
+Os formatos seguem a sintaxe do Moment.js.
+
+## Configurações
+
+Nas configurações do plugin, você pode escolher:
+
+- **Pasta de destino** das notas. O padrão é `base_notes`; deixe vazia para
+  salvar na raiz do vault. Para criar a pasta em relação à pasta da nota atual,
+  use `{{currentFolder}}`, por exemplo `{{currentFolder}}/base_notes`.
+- **Coluna do nome do arquivo**. O padrão é `name`.
+- A coluna `content` fornece o corpo da nota.
+- **Tag da Base**. Se ficar vazia, será usado o nome da nota onde está a
+  tabela.
+- Se as propriedades podem ter **valores vazios**.
+- **Idioma** da interface. Você pode escolher português ou inglês; no modo
+  automático, o plugin acompanha o idioma do Obsidian.
+
+O plugin não substitui notas existentes. Se um nome já estiver em uso, ele
+acrescenta um sufixo, como `_2`. Se o arquivo `.base` da nota já existir, ele
+será reutilizado.
+
+## Instalação manual
+
+1. Execute `npm ci` na pasta do projeto.
+2. Execute `npm run build`.
+3. Copie `main.js` e `manifest.json` para:
+   `<Vault>/.obsidian/plugins/obsidian-table-to-base-plugin/`.
+4. No Obsidian, recarregue os plugins e ative **Obsidian Table to Base** em
+   **Configurações → Plugins da comunidade**.
+
+As traduções são incluídas em `main.js` durante o build; não é preciso copiar
+os arquivos da pasta `src/`.
+
+## Desenvolvimento
+
+Requisitos: Node.js 18 ou superior e npm.
+
+```bash
+npm ci
+npm run dev
 ```
 
-## API Documentation
+`npm run dev` recompila o plugin enquanto você edita os arquivos. Para
+validar as alterações:
 
-See https://docs.obsidian.md
+```bash
+npm test
+npm run build
+npm run lint
+```
+
+O código-fonte fica em `src/`. O build gera `main.js` na raiz; esse arquivo é
+artefato gerado e não deve ser versionado.

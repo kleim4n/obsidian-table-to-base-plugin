@@ -1,13 +1,14 @@
 {
-	"name": "obsidian-sample-plugin",
+	"name": "obsidian-table-to-base-plugin",
 	"version": "1.0.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"description": "Converts Markdown tables into notes and Obsidian Bases.",
 	"main": "main.js",
 	"type": "module",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
 		"version": "node version-bump.mjs && git add manifest.json versions.json",
+		"test": "jiti tests/conversionFormat.test.ts",
 		"lint": "eslint ."
 	},
 	"keywords": [],
