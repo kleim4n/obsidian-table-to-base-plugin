@@ -1,7 +1,7 @@
 {
-	"name": "md-table-2-obsidian-base-plugin",
+	"name": "obsidian-table-to-base-plugin",
 	"version": "1.0.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"description": "Converts Markdown tables into notes and Obsidian Bases.",
 	"main": "main.js",
 	"type": "module",
 	"scripts": {

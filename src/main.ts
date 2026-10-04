@@ -1,13 +1,58 @@
-import { Notice, Plugin } from 'obsidian';
+import { Editor, Notice, Plugin, TFile } from 'obsidian';
 import { convertTableToBase } from './conversion';
+import { DEFAULT_SETTINGS, PluginSettings } from './settings';
+import { PluginSettingTab } from './settingsTab';
+import { translate } from './i18n';
 
 export default class MarkdownTableToBasePlugin extends Plugin {
+	settings: PluginSettings = DEFAULT_SETTINGS;
+
 	async onload() {
+		this.settings = Object.assign(
+			{},
+			DEFAULT_SETTINGS,
+			(await this.loadData()) as Partial<PluginSettings>,
+		);
+		this.addSettingTab(new PluginSettingTab(this.app, this));
+		this.addCommand({
+			id: 'convert-table-to-base',
+			name: translate(this.settings.language, 'command.paletteConvert'),
+			callback: async () => {
+				const activeEditor = this.app.workspace.activeEditor;
+				if (!activeEditor?.editor || !activeEditor.file) {
+					new Notice(
+						translate(this.settings.language, 'notice.missingFile'),
+					);
+					return;
+				}
+
+				const tables = findTables(activeEditor.editor.getValue().split('\n'));
+				if (tables.length === 0) {
+					new Notice(translate(this.settings.language, 'notice.noTable'));
+					return;
+				}
+				if (tables.length > 1) {
+					new Notice(
+						translate(this.settings.language, 'notice.multipleTables', {
+							count: tables.length,
+						}),
+					);
+					return;
+				}
+
+				await this.convertAndReplaceTable(
+					activeEditor.editor,
+					activeEditor.file,
+					tables[0]!,
+				);
+			},
+		});
 		this.registerEvent(
 			this.app.workspace.on('editor-menu', (menu, editor, info) => {
-				const table = findTableAtLine(
-					editor.getValue().split('\n'),
-					editor.getCursor().line,
+				const table = findTables(editor.getValue().split('\n')).find(
+					(candidate) =>
+						editor.getCursor().line >= candidate.startLine &&
+						editor.getCursor().line <= candidate.endLine,
 				);
 				if (!table) {
 					return;
@@ -15,45 +60,56 @@ export default class MarkdownTableToBasePlugin extends Plugin {
 
 				menu.addItem((item) =>
 					item
-						.setTitle('Converter em Base+Notas')
+						.setTitle(translate(this.settings.language, 'command.convert'))
 						.setIcon('database')
-						.onClick(async () => {
-							const file = info.file;
-							if (!file) {
-								new Notice('Não foi possível identificar a nota atual.');
-								return;
-							}
-
-							try {
-								const embed = await convertTableToBase(
-									this.app,
-									table,
-									file.basename,
-								);
-								editor.replaceRange(
-									embed,
-									{ line: table.startLine, ch: 0 },
-									{
-										line: table.endLine,
-										ch: editor.getLine(table.endLine).length,
-									},
-								);
-								new Notice('Tabela convertida em Base+Notas.');
-							} catch (error) {
-								const message =
-									error instanceof Error
-										? error.message
-										: String(error);
-								new Notice(`Falha ao converter a tabela: ${message}`);
-							}
-						}),
+						.onClick(() =>
+							info.file
+								? this.convertAndReplaceTable(editor, info.file, table)
+								: new Notice(
+									translate(this.settings.language, 'notice.missingFile'),
+								),
+						),
 				);
 			}),
 		);
 	}
+
+	private async convertAndReplaceTable(
+		editor: Editor,
+		file: TFile,
+		table: MarkdownTable,
+	): Promise<void> {
+		try {
+			const embed = await convertTableToBase(
+				this.app,
+				table,
+				this.app.fileManager,
+				file.basename,
+				this.settings,
+				this.settings.language,
+			);
+			editor.replaceRange(
+				embed,
+				{ line: table.startLine, ch: 0 },
+				{
+					line: table.endLine,
+					ch: editor.getLine(table.endLine).length,
+				},
+			);
+			new Notice(translate(this.settings.language, 'notice.success'));
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			new Notice(
+				translate(this.settings.language, 'notice.failure', {
+					error: message,
+				}),
+			);
+		}
+	}
 }
 
-function findTableAtLine(lines: string[], line: number): MarkdownTable | null {
+function findTables(lines: string[]): MarkdownTable[] {
+	const tables: MarkdownTable[] = [];
 	for (let headerLine = 0; headerLine < lines.length - 1; headerLine++) {
 		const headerText = lines[headerLine];
 		const delimiterText = lines[headerLine + 1];
@@ -79,23 +135,22 @@ function findTableAtLine(lines: string[], line: number): MarkdownTable | null {
 			}
 			endLine++;
 		}
-		if (line < headerLine || line > endLine) {
-			continue;
-		}
-
 		const rows: string[][] = [];
 		for (let rowLine = headerLine + 2; rowLine <= endLine; rowLine++) {
 			const rowText = lines[rowLine];
 			const row = rowText === undefined ? null : splitTableRow(rowText);
 			if (!row) {
-				return null;
+				rows.length = 0;
+				break;
 			}
 			rows.push(row);
 		}
-
-		return { startLine: headerLine, endLine, headers, rows };
+		if (rows.length === endLine - headerLine - 1) {
+			tables.push({ startLine: headerLine, endLine, headers, rows });
+			headerLine = endLine;
+		}
 	}
-	return null;
+	return tables;
 }
 
 function splitTableRow(line: string): string[] | null {
