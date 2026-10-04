@@ -10,15 +10,17 @@ Imagine que você está preparando o semestre de uma disciplina. Pode listar
 leituras, trabalhos, provas e outras atividades numa tabela dentro da nota da
 disciplina:
 
-| file_name | file_content | tipo | data | status | tags |
-| --- | --- | --- | --- | --- | --- |
-| Leitura - semana 1 | Ler o capítulo introdutório e anotar dúvidas. | Leitura | 2026-03-09 | Pendente | estudo |
-| Trabalho - resenha | Preparar uma resenha do texto escolhido. | Trabalho | 2026-04-02 | Pendente | estudo, escrita |
-| Prova parcial | Rever as anotações das primeiras semanas. | Prova | 2026-05-12 | Pendente | estudo |
+| name | content | tipo | data | data_type | feito | feito_type | tags |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Leitura - semana 1 | Ler o capítulo introdutório e anotar dúvidas. | Leitura | 2026-03-09 | date | false | checkbox | estudo |
+| Trabalho - resenha | Preparar uma resenha do texto escolhido. | Trabalho | 2026-04-02 | date | null | bool | estudo, escrita |
+| Prova parcial | Rever as anotações das primeiras semanas. | Prova | 2026-05-12 | date | false | check box | estudo |
 
 Ao converter a tabela, cada linha vira uma nota. As colunas `tipo`, `data`,
-`status` e `tags` são salvas como propriedades, e `file_content` vira o corpo
-da nota. Assim, você pode abrir uma atividade para acrescentar anotações sem
+`feito` e `tags` são salvas como propriedades, e `content` vira o corpo
+da nota. A coluna `feito_type` define o tipo da propriedade `feito` para a
+linha; `checkbox`, `bool` e `check box` são aceitos para caixas de seleção.
+Assim, você pode abrir uma atividade para acrescentar anotações sem
 perder a visão geral do semestre.
 
 ### O que será criado
@@ -48,14 +50,26 @@ encontra exatamente uma tabela Markdown no arquivo; se encontrar mais de uma,
 avisa que esse modo processa uma tabela por vez.
 
 A tabela precisa ter uma coluna para o nome do arquivo e outra chamada
-`file_content`. Por padrão, a coluna de nome é `file_name`.
+`content`. Por padrão, a coluna de nome é `name`.
 
 | Coluna | Para que serve |
 | --- | --- |
-| `file_name` | Nome da nota gerada. O nome da coluna pode ser alterado nas configurações. |
-| `file_content` | Texto que forma o corpo da nota. |
+| `name` | Nome da nota gerada. O nome da coluna pode ser alterado nas configurações. |
+| `content` | Texto que forma o corpo da nota. |
 | Outras colunas | Propriedades no frontmatter da nota. |
 | `tags` | Tags separadas por vírgulas; a tag da Base é acrescentada automaticamente. |
+| `<propriedade>_type` | Declara o tipo da propriedade correspondente. A coluna auxiliar não vira propriedade. |
+
+Tipos suportados: `text`, `list`, `number`, `bool`, `checkbox`, `date`,
+`date & time` (ou `datetime`) e `tags`. Para booleanos, use `true`, `false` ou
+`null`. A mesma propriedade precisa usar o mesmo tipo em todas as linhas.
+Listas podem ser separadas por vírgula ou escritas como JSON; datas devem estar
+no formato ISO, como `2026-03-09`.
+
+Use `{{date:FORMATO}}` em **Pasta de destino** e na coluna `name` para inserir
+a data/hora atual. Por exemplo, `{{date:YYYY}}/{{date:MM}}` cria pastas por
+ano e mês; `Atividade {{date:YYYY-MM-DD}}` inclui a data no nome da nota.
+Os formatos seguem a sintaxe do Moment.js.
 
 ## Configurações
 
@@ -64,7 +78,8 @@ Nas configurações do plugin, você pode escolher:
 - **Pasta de destino** das notas. O padrão é `base_notes`; deixe vazia para
   salvar na raiz do vault. Para criar a pasta em relação à pasta da nota atual,
   use `{{currentFolder}}`, por exemplo `{{currentFolder}}/base_notes`.
-- **Coluna do nome do arquivo**. O padrão é `file_name`.
+- **Coluna do nome do arquivo**. O padrão é `name`.
+- A coluna `content` fornece o corpo da nota.
 - **Tag da Base**. Se ficar vazia, será usado o nome da nota onde está a
   tabela.
 - Se as propriedades podem ter **valores vazios**.
@@ -100,6 +115,7 @@ npm run dev
 validar as alterações:
 
 ```bash
+npm test
 npm run build
 npm run lint
 ```

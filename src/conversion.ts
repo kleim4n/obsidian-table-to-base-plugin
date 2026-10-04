@@ -1,6 +1,11 @@
-import { App, FileManager, TAbstractFile, TFile, TFolder } from 'obsidian';
+import { App, FileManager, moment, TFile, TFolder } from 'obsidian';
 import { PluginSettings } from './settings';
 import { translate } from './i18n';
+import {
+	formatDatePatterns,
+	mapTypeColumns,
+	serializeTypedCell,
+} from './conversionFormat';
 
 export async function convertTableToBase(
 	app: App,
@@ -13,17 +18,17 @@ export async function convertTableToBase(
 ): Promise<string> {
 	const headers = table.headers.map((header) => header.trim());
 	const fileNameColumn = headers.indexOf(settings.fileNameColumn.trim());
-	const contentColumn = headers.indexOf('file_content');
+	const contentColumn = headers.indexOf('content');
 
 	if (
 		!settings.fileNameColumn.trim() ||
-		settings.fileNameColumn.trim() === 'file_content' ||
+		settings.fileNameColumn.trim() === 'content' ||
 		fileNameColumn === -1 ||
 		contentColumn === -1
 	) {
 		throw new Error(
 			translate(language, 'error.tableRequired', {
-				fileNameColumn: settings.fileNameColumn || 'file_name',
+				fileNameColumn: settings.fileNameColumn || 'name',
 			}),
 		);
 	}
@@ -37,11 +42,21 @@ export async function convertTableToBase(
 		throw new Error(translate(language, 'error.rowLength'));
 	}
 
-	const folderPath = normalizeFolderPath(
-		settings.outputFolder,
-		sourceFolderPath,
-		language,
+	const conversionTime = moment();
+	const expandedFolder = formatDatePatterns(
+		settings.outputFolder
+			.trim()
+			.replace(/\\/g, '/')
+			.replaceAll('{{currentFolder}}', sourceFolderPath),
+		(pattern) => conversionTime.format(pattern),
 	);
+	const folderPath = expandedFolder.replace(/^\/+|\/+$/g, '');
+	if (
+		folderPath &&
+		folderPath.split('/').some((segment) => segment === '' || segment === '.' || segment === '..')
+	) {
+		throw new Error(translate(language, 'error.invalidFolder'));
+	}
 	const basePath = `${sourceBasename}_base.base`;
 	const loadedFiles = app.vault.getAllLoadedFiles();
 	const existingPaths = new Set(loadedFiles.map((file) => file.path.toLowerCase()));
@@ -54,18 +69,63 @@ export async function convertTableToBase(
 		);
 	}
 
-	const folderEntries = ensureFolderPathEntries(folderPath, loadedFiles, language);
-	const baseTag = normalizeTag(settings.baseTag.trim() || sourceBasename);
+	const folderEntries: string[] = [];
+	let currentPath = '';
+	for (const segment of folderPath.split('/').filter(Boolean)) {
+		currentPath = currentPath ? `${currentPath}/${segment}` : segment;
+		const existing = loadedFiles.find(
+			(file) => file.path.toLowerCase() === currentPath.toLowerCase(),
+		);
+		if (existing && !(existing instanceof TFolder)) {
+			throw new Error(
+				translate(language, 'error.fileConflict', { path: currentPath }),
+			);
+		}
+		if (existing && existing.path !== currentPath) {
+			throw new Error(
+				translate(language, 'error.folderConflict', { path: existing.path }),
+			);
+		}
+		if (!existing) {
+			folderEntries.push(currentPath);
+		}
+	}
+	const baseTag = (settings.baseTag.trim() || sourceBasename)
+		.trim()
+		.replace(/^#+/, '')
+		.replace(/\s+/g, '-');
 	if (!baseTag) {
 		throw new Error(translate(language, 'error.invalidTag'));
 	}
 
-	const fileNames = new Set<string>();
-	const generatedNotes = table.rows.map((row, rowIndex) => {
-		const requestedName = sanitizeFileName(
-			getCell(row, fileNameColumn, settings.fileNameColumn, language),
+	const typeColumnMapping = mapTypeColumns(headers);
+	if (typeColumnMapping.orphanColumn) {
+		throw new Error(
+			translate(language, 'error.orphanTypeColumn', {
+				column: typeColumnMapping.orphanColumn,
+			}),
 		);
-		if (!requestedName) {
+	}
+	const typeColumnIndexes = typeColumnMapping.columns;
+	const declaredPropertyTypes = new Map<string, string>();
+	const reservedNames = new Set<string>();
+	const generatedNotes = table.rows.map((row, rowIndex) => {
+		const requestedName = formatDatePatterns(
+			getCell(row, fileNameColumn, settings.fileNameColumn, language),
+			(pattern) => conversionTime.format(pattern),
+		)
+			.trim()
+			.replace(/\.md$/i, '')
+			.replace(/[\\/:*?"<>|]/g, '-');
+		const sanitizedName = Array.from(
+			requestedName,
+			(character) => (character.charCodeAt(0) <= 0x1f ? '-' : character),
+		)
+			.join('')
+			.replace(/[. ]+$/g, '')
+			.trim()
+			.replace(/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i, '_$1');
+		if (!sanitizedName) {
 			throw new Error(
 				translate(language, 'error.emptyFileName', {
 					column: settings.fileNameColumn,
@@ -73,21 +133,40 @@ export async function convertTableToBase(
 			);
 		}
 
-		const content = getCell(row, contentColumn, 'file_content', language);
+		const content = getCell(row, contentColumn, 'content', language);
 		const tagsColumn = headers.findIndex((header) => header.toLowerCase() === 'tags');
-		const tags = tagsColumn === -1
-			? [baseTag]
-			: [
-				...new Set([
-					...parseTags(getCell(row, tagsColumn, 'tags', language)),
-					baseTag,
-				]),
-			];
+		let rowTags: string[] = [];
+		if (tagsColumn !== -1) {
+			const tagsValue = getCell(row, tagsColumn, 'tags', language).trim();
+			if (tagsValue.startsWith('[')) {
+				try {
+					const parsed: unknown = JSON.parse(tagsValue);
+					rowTags =
+						Array.isArray(parsed) && parsed.every((tag) => typeof tag === 'string')
+							? parsed
+							: tagsValue.split(',');
+				} catch {
+					rowTags = tagsValue.split(',');
+				}
+			} else {
+				rowTags = tagsValue.split(',');
+			}
+		}
+		const tags = [
+			...new Set([
+				...rowTags
+					.map((tag) => tag.trim().replace(/^#+/, '').replace(/\s+/g, '-'))
+					.filter(Boolean),
+				baseTag,
+			]),
+		];
 		const properties = headers
 			.map((header, index) => ({ header, index }))
 			.filter(
 				({ header }) =>
-					header !== settings.fileNameColumn.trim() && header !== 'file_content',
+					header !== settings.fileNameColumn.trim() &&
+					header !== 'content' &&
+					!header.toLowerCase().endsWith('_type'),
 			)
 			.map(({ header, index }) => {
 				const value = getCell(row, index, header, language);
@@ -99,23 +178,76 @@ export async function convertTableToBase(
 						}),
 					);
 				}
-				return [
-					`${JSON.stringify(header.toLowerCase() === 'tags' ? 'tags' : header)}:`,
-					header.toLowerCase() === 'tags'
-						? JSON.stringify(tags)
-						: JSON.stringify(value),
-				].join(' ');
+				let serializedValue = JSON.stringify(value);
+				if (header.toLowerCase() === 'tags') {
+					serializedValue = JSON.stringify(tags);
+				} else if (typeColumnIndexes.has(header)) {
+					const typeColumnIndex = typeColumnIndexes.get(header);
+					if (typeColumnIndex === undefined) {
+						throw new Error(
+							translate(language, 'error.orphanTypeColumn', {
+								column: `${header}_type`,
+							}),
+						);
+					}
+					const declaredType = getCell(
+						row,
+						typeColumnIndex,
+						`${header}_type`,
+						language,
+					);
+					const normalizedType = declaredType
+						.trim()
+						.toLowerCase()
+						.replace(/[\s_&-]/g, '');
+					const existingType = declaredPropertyTypes.get(header);
+					if (
+						declaredPropertyTypes.has(header) &&
+						existingType !== normalizedType
+					) {
+						throw new Error(
+							translate(language, 'error.inconsistentPropertyType', {
+								column: header,
+							}),
+						);
+					}
+					declaredPropertyTypes.set(header, normalizedType);
+					const result = serializeTypedCell(value, declaredType);
+					if (!result.ok) {
+						const translationKey =
+							result.reason === 'unsupported-type'
+								? 'error.unsupportedPropertyType'
+								: 'error.invalidTypedValue';
+						throw new Error(
+							translate(language, translationKey, {
+								column: header,
+								type: result.type,
+								value: result.value,
+							}),
+						);
+					}
+					serializedValue = result.yaml;
+				}
+				const propertyName =
+					header.toLowerCase() === 'tags' ? 'tags' : header;
+				return `${JSON.stringify(propertyName)}: ${serializedValue}`;
 			});
 		if (tagsColumn === -1) {
 			properties.push(`"tags": ${JSON.stringify(tags)}`);
 		}
 
-		const filename = getUniqueFileName(
-			requestedName,
-			folderPath,
-			fileNames,
-			existingPaths,
-		);
+		let filename = sanitizedName;
+		let suffix = 2;
+		while (
+			reservedNames.has(filename.toLowerCase()) ||
+			existingPaths.has(
+				`${folderPath ? `${folderPath}/` : ''}${filename}.md`.toLowerCase(),
+			)
+		) {
+			filename = `${sanitizedName}_${suffix}`;
+			suffix++;
+		}
+		reservedNames.add(filename.toLowerCase());
 		const noteContent = properties.length
 			? `---\n${properties.join('\n')}\n---\n${content}`
 			: content;
@@ -127,13 +259,36 @@ export async function convertTableToBase(
 		};
 	});
 
-	const baseContent = createBaseContent(
-		headers,
-		folderPath,
-		baseTag,
-		settings.fileNameColumn,
-		language,
-	);
+	const columns = [
+		'file.name',
+		...headers.filter(
+			(header) =>
+				header !== settings.fileNameColumn.trim() &&
+				header !== 'content' &&
+				!header.toLowerCase().endsWith('_type'),
+		).map((header) => header.toLowerCase() === 'tags' ? 'tags' : header),
+	];
+	if (!columns.some((column) => column.toLowerCase() === 'tags')) {
+		columns.push('tags');
+	}
+	const filters = [
+		...(folderPath
+			? [`    - file.inFolder(${JSON.stringify(folderPath)})`]
+			: []),
+		'    - file.ext == "md"',
+		`    - file.hasTag(${JSON.stringify(baseTag)})`,
+	];
+	const baseContent = [
+		'filters:',
+		'  and:',
+		...filters,
+		'views:',
+		'  - type: table',
+		`    name: ${translate(language, 'base.viewName')}`,
+		'    order:',
+		...columns.map((column) => `      - ${JSON.stringify(column)}`),
+		'',
+	].join('\n');
 	const createdFiles: TFile[] = [];
 	const createdFolders: TFolder[] = [];
 	try {
@@ -146,9 +301,14 @@ export async function convertTableToBase(
 		}
 		if (baseEntry instanceof TFile) {
 			const existingBaseContent = await app.vault.read(baseEntry);
+			const existingViewsStart = existingBaseContent.indexOf('\nviews:');
+			const generatedViewsStart = baseContent.indexOf('\nviews:');
+			if (existingViewsStart === -1 || generatedViewsStart === -1) {
+				throw new Error(translate(language, 'error.baseUpdateUnsupported'));
+			}
 			await app.vault.modify(
 				baseEntry,
-				updateBaseFilters(existingBaseContent, baseContent, language),
+				`${baseContent.slice(0, generatedViewsStart)}\n${existingBaseContent.slice(existingViewsStart + 1)}`,
 			);
 		} else {
 			createdFiles.push(await app.vault.create(basePath, baseContent));
@@ -185,22 +345,6 @@ export async function convertTableToBase(
 	return `![[${basePath}]]`;
 }
 
-function updateBaseFilters(
-	existingContent: string,
-	generatedContent: string,
-	language: string,
-): string {
-	const existingViewsStart = existingContent.indexOf('\nviews:');
-	const generatedViewsStart = generatedContent.indexOf('\nviews:');
-	if (existingViewsStart === -1 || generatedViewsStart === -1) {
-		throw new Error(translate(language, 'error.baseUpdateUnsupported'));
-	}
-
-	const generatedFilters = generatedContent.slice(0, generatedViewsStart);
-	const existingViews = existingContent.slice(existingViewsStart + 1);
-	return `${generatedFilters}\n${existingViews}`;
-}
-
 function getCell(
 	row: string[],
 	index: number,
@@ -214,154 +358,8 @@ function getCell(
 	return value;
 }
 
-function getUniqueFileName(
-	name: string,
-	folderPath: string,
-	reservedNames: Set<string>,
-	existingPaths: Set<string>,
-): string {
-	let candidate = name;
-	let suffix = 2;
-	while (
-		reservedNames.has(candidate.toLowerCase()) ||
-		existingPaths.has(
-			`${folderPath ? `${folderPath}/` : ''}${candidate}.md`.toLowerCase(),
-		)
-	) {
-		candidate = `${name}_${suffix}`;
-		suffix++;
-	}
-	reservedNames.add(candidate.toLowerCase());
-	return candidate;
-}
-
-function sanitizeFileName(name: string): string {
-	const sanitized = Array.from(
-		name.trim().replace(/\.md$/i, '').replace(/[\\/:*?"<>|]/g, '-'),
-		(character) => (character.charCodeAt(0) <= 0x1f ? '-' : character),
-	)
-		.join('')
-		.replace(/[. ]+$/g, '')
-		.trim();
-	return /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(sanitized)
-		? `_${sanitized}`
-		: sanitized;
-}
-
-function normalizeFolderPath(
-	path: string,
-	sourceFolderPath: string,
-	language: string,
-): string {
-	const normalized = path
-		.trim()
-		.replace(/\\/g, '/')
-		.replaceAll('{{currentFolder}}', sourceFolderPath)
-		.replace(/^\/+|\/+$/g, '');
-	if (
-		normalized.split('/').some((segment) =>
-			segment === '' || segment === '.' || segment === '..',
-		)
-	) {
-		if (normalized) {
-			throw new Error(translate(language, 'error.invalidFolder'));
-		}
-	}
-	return normalized;
-}
-
-function ensureFolderPathEntries(
-	folderPath: string,
-	loadedFiles: TAbstractFile[],
-	language: string,
-): string[] {
-	const entries: string[] = [];
-	let currentPath = '';
-	for (const segment of folderPath.split('/').filter(Boolean)) {
-		currentPath = currentPath ? `${currentPath}/${segment}` : segment;
-		const existing = loadedFiles.find(
-			(file) => file.path.toLowerCase() === currentPath.toLowerCase(),
-		);
-		if (existing && !(existing instanceof TFolder)) {
-			throw new Error(
-				translate(language, 'error.fileConflict', { path: currentPath }),
-			);
-		}
-		if (existing && existing.path !== currentPath) {
-			throw new Error(
-				translate(language, 'error.folderConflict', { path: existing.path }),
-			);
-		}
-		if (!existing) {
-			entries.push(currentPath);
-		}
-	}
-	return entries;
-}
-
-function normalizeTag(tag: string): string {
-	return tag.trim().replace(/^#+/, '').replace(/\s+/g, '-');
-}
-
-function parseTags(value: string): string[] {
-	const trimmed = value.trim();
-	let values: string[];
-	if (trimmed.startsWith('[')) {
-		try {
-			const parsed: unknown = JSON.parse(trimmed);
-			values =
-				Array.isArray(parsed) && parsed.every((tag) => typeof tag === 'string')
-					? parsed
-					: trimmed.split(',');
-		} catch {
-			values = trimmed.split(',');
-		}
-	} else {
-		values = trimmed.split(',');
-	}
-	return values
-		.map(normalizeTag)
-		.filter(Boolean);
-}
-
 function getErrorMessage(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
-}
-
-function createBaseContent(
-	headers: string[],
-	folderPath: string,
-	baseTag: string,
-	fileNameColumn: string,
-	language: string,
-): string {
-	const columns = [
-		'file.name',
-		...headers.filter(
-			(header) => header !== fileNameColumn && header !== 'file_content',
-		).map((header) => header.toLowerCase() === 'tags' ? 'tags' : header),
-	];
-	if (!columns.some((column) => column.toLowerCase() === 'tags')) {
-		columns.push('tags');
-	}
-	const filters = [
-		...(folderPath
-			? [`    - file.inFolder(${JSON.stringify(folderPath)})`]
-			: []),
-		'    - file.ext == "md"',
-		`    - file.hasTag(${JSON.stringify(baseTag)})`,
-	];
-	return [
-		'filters:',
-		'  and:',
-		...filters,
-		'views:',
-		'  - type: table',
-		`    name: ${translate(language, 'base.viewName')}`,
-		'    order:',
-		...columns.map((column) => `      - ${JSON.stringify(column)}`),
-		'',
-	].join('\n');
 }
 
 interface MarkdownTable {

@@ -8,7 +8,7 @@ export interface PluginSettings {
 
 export const DEFAULT_SETTINGS: PluginSettings = {
 	outputFolder: 'base_notes',
-	fileNameColumn: 'file_name',
+	fileNameColumn: 'name',
 	baseTag: '',
 	allowEmptyColumns: true,
 	language: '',
